@@ -74,10 +74,8 @@ climate-resilience-himalayan-tourism/
 
 ## 👥 Authors & Credits
 
-- **Sneha Chaudhary** - *Lead Data Engineer & Analytics Specialist* ([GitHub](https://github.com/scodes-byte) | [LinkedIn](https://linkedin.com/in/sneha-chaudhary-791b2a283))
-- **Hritvik Bhandari**
-- **Vishnu Choudhary**
-- **Kritika Gupta**
+- **Sneha Chaudhary** -  ([GitHub](https://github.com/scodes-byte) | [LinkedIn](https://linkedin.com/in/sneha-chaudhary-791b2a283))
+
 
 ---
 
