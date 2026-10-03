@@ -1,0 +1,103 @@
+// ============================================================================
+// CLIMATE RESILIENCE OF HIMALAYAN TOURISM - ADVANCED DAX MEASURES LIBRARY
+// Author: Sneha Chaudhary
+// Usage: Copy and paste these DAX measures into Power BI Desktop
+// ============================================================================
+
+// ----------------------------------------------------------------------------
+// 1. KEY PERFORMANCE INDICATORS (KPIs)
+// ----------------------------------------------------------------------------
+
+Total Tourist Footfall = 
+SUM('uttarakhand_district_tourism_fixed'[Tourist_Count])
+
+Domestic Tourists = 
+CALCULATE(
+    SUM('uttarakhand_district_tourism_fixed'[Tourist_Count]),
+    'uttarakhand_district_tourism_fixed'[Category] = "Domestic"
+)
+
+International Tourists = 
+CALCULATE(
+    SUM('uttarakhand_district_tourism_fixed'[Tourist_Count]),
+    'uttarakhand_district_tourism_fixed'[Category] = "International"
+)
+
+Average Monthly Rainfall (mm) = 
+AVERAGE('uttarakhand_district_tourism_fixed'[Rainfall_mm])
+
+Total Landslide Events = 
+SUM('uttarakhand_district_tourism_fixed'[Landslide_Count])
+
+// ----------------------------------------------------------------------------
+// 2. TIME-INTELLIGENCE & GROWTH MEASURES
+// ----------------------------------------------------------------------------
+
+YoY Tourist Growth % = 
+VAR PreviousYearFootfall = 
+    CALCULATE(
+        [Total Tourist Footfall], 
+        SAMEPERIODLASTYEAR('Calendar'[Date])
+    )
+RETURN
+    DIVIDE([Total Tourist Footfall] - PreviousYearFootfall, PreviousYearFootfall, 0)
+
+MoM Footfall Change % = 
+VAR PreviousMonthFootfall = 
+    CALCULATE(
+        [Total Tourist Footfall], 
+        DATEADD('Calendar'[Date], -1, MONTH)
+    )
+RETURN
+    DIVIDE([Total Tourist Footfall] - PreviousMonthFootfall, PreviousMonthFootfall, 0)
+
+// ----------------------------------------------------------------------------
+// 3. CLIMATE VULNERABILITY INDEX (CVI) & RISK SCORING
+// ----------------------------------------------------------------------------
+
+Climate Vulnerability Score = 
+VAR NormalizedRainfall = 
+    DIVIDE(
+        [Average Monthly Rainfall (mm)], 
+        MAXX(ALL('uttarakhand_district_tourism_fixed'), 'uttarakhand_district_tourism_fixed'[Rainfall_mm]), 
+        0
+    ) * 50
+
+VAR NormalizedLandslides = 
+    DIVIDE(
+        [Total Landslide Events], 
+        MAXX(ALL('uttarakhand_district_tourism_fixed'), 'uttarakhand_district_tourism_fixed'[Landslide_Count]), 
+        0
+    ) * 50
+
+RETURN
+    ROUND(NormalizedRainfall + NormalizedLandslides, 1)
+
+Risk Level Indicator = 
+VAR Score = [Climate Vulnerability Score]
+RETURN
+    SWITCH(
+        TRUE(),
+        Score >= 70, "High Risk 🔴",
+        Score >= 40, "Moderate Risk 🟡",
+        "Low Risk 🟢"
+    )
+
+// ----------------------------------------------------------------------------
+// 4. SCENARIO ANALYSIS & RESILIENCE METRICS
+// ----------------------------------------------------------------------------
+
+Monsoon Footfall Share % = 
+VAR MonsoonFootfall = 
+    CALCULATE(
+        [Total Tourist Footfall],
+        FILTER('Calendar', 'Calendar'[MonthName] IN {"July", "August", "September"})
+    )
+RETURN
+    DIVIDE(MonsoonFootfall, [Total Tourist Footfall], 0)
+
+Post-Disaster Recovery Index = 
+VAR PostDisasterFootfall = CALCULATE([Total Tourist Footfall], DATEADD('Calendar'[Date], 1, MONTH))
+VAR PreDisasterFootfall  = CALCULATE([Total Tourist Footfall], DATEADD('Calendar'[Date], -1, MONTH))
+RETURN
+    DIVIDE(PostDisasterFootfall, PreDisasterFootfall, 0)
