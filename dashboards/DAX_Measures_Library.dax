@@ -1,103 +1,96 @@
 // ============================================================================
-// CLIMATE RESILIENCE OF HIMALAYAN TOURISM - ADVANCED DAX MEASURES LIBRARY
+// CLIMATE RESILIENCE OF HIMALAYAN TOURISM - DAX MEASURES
 // Author: Sneha Chaudhary
-// Usage: Copy and paste these DAX measures into Power BI Desktop
+//
+// Built for the cleaned tables produced by src/data_preprocessing.py and src/analysis.py:
+//   Tourism     <- data/processed/tourism_district_year.csv   (District, Year, Indian, Foreign, Total, ...)
+//   Rainfall    <- data/processed/rainfall_district_year.csv  (District, Year, Annual_Rainfall_mm, ...)
+//   Landslides  <- data/processed/landslides_by_year.csv      (Year, Landslides, Type, Comparable_Event_Count)
+//   Resilience  <- data/processed/district_resilience.csv     (District, Resilience_Index, ...)
+//   District    dimension: DISTINCT(Tourism[District])
+//   Year        dimension: GENERATESERIES(2000, 2024, 1)
+// Relationships (single direction, 1:*): District -> Tourism, Rainfall, Resilience;
+//                                         Year -> Tourism, Rainfall, Landslides
 // ============================================================================
 
-// ----------------------------------------------------------------------------
-// 1. KEY PERFORMANCE INDICATORS (KPIs)
-// ----------------------------------------------------------------------------
-
-Total Tourist Footfall = 
-SUM('uttarakhand_district_tourism_fixed'[Tourist_Count])
-
-Domestic Tourists = 
-CALCULATE(
-    SUM('uttarakhand_district_tourism_fixed'[Tourist_Count]),
-    'uttarakhand_district_tourism_fixed'[Category] = "Domestic"
-)
-
-International Tourists = 
-CALCULATE(
-    SUM('uttarakhand_district_tourism_fixed'[Tourist_Count]),
-    'uttarakhand_district_tourism_fixed'[Category] = "International"
-)
-
-Average Monthly Rainfall (mm) = 
-AVERAGE('uttarakhand_district_tourism_fixed'[Rainfall_mm])
-
-Total Landslide Events = 
-SUM('uttarakhand_district_tourism_fixed'[Landslide_Count])
 
 // ----------------------------------------------------------------------------
-// 2. TIME-INTELLIGENCE & GROWTH MEASURES
+// 1. TOURISM KPIs
 // ----------------------------------------------------------------------------
 
-YoY Tourist Growth % = 
-VAR PreviousYearFootfall = 
-    CALCULATE(
-        [Total Tourist Footfall], 
-        SAMEPERIODLASTYEAR('Calendar'[Date])
+Total Visitors =
+SUM ( Tourism[Total] )
+
+Domestic Visitors =
+SUM ( Tourism[Indian] )
+
+Foreign Visitors =
+SUM ( Tourism[Foreign] )
+
+Foreign Share % =
+DIVIDE ( [Foreign Visitors], [Total Visitors] )
+
+// Year-over-year change using the integer Year dimension (no date table needed for annual data)
+Visitors Previous Year =
+VAR CurrentYear = SELECTEDVALUE ( 'Year'[Year] )
+RETURN
+    CALCULATE ( [Total Visitors], 'Year'[Year] = CurrentYear - 1 )
+
+YoY Visitor Change % =
+DIVIDE ( [Total Visitors] - [Visitors Previous Year], [Visitors Previous Year] )
+
+
+// ----------------------------------------------------------------------------
+// 2. RAINFALL
+// Annual_Rainfall_mm = mean daily rainfall x days in year. Do NOT use the raw
+// Total_Rainfall_mm column: it is summed over grid cells, so it grows with district area.
+// ----------------------------------------------------------------------------
+
+Avg Annual Rainfall (mm) =
+AVERAGE ( Rainfall[Annual_Rainfall_mm] )
+
+Rainfall Anomaly % =
+AVERAGE ( Rainfall[Rainfall_Anomaly_pct] ) / 100
+
+
+// ----------------------------------------------------------------------------
+// 3. LANDSLIDES
+// Rows come from different counting methods; only event-based counts are comparable.
+// ----------------------------------------------------------------------------
+
+Landslides (Event-based) =
+CALCULATE ( SUM ( Landslides[Landslides] ), Landslides[Comparable_Event_Count] = TRUE () )
+
+
+// ----------------------------------------------------------------------------
+// 4. SHOCK & RESILIENCE
+// ----------------------------------------------------------------------------
+
+// Visitors in the selected year as % of a fixed pre-shock baseline (2012 for Kedarnath 2013)
+Visitors vs 2012 Baseline =
+VAR Baseline =
+    CALCULATE ( [Total Visitors], REMOVEFILTERS ( 'Year' ), 'Year'[Year] = 2012 )
+RETURN
+    DIVIDE ( [Total Visitors], Baseline )
+
+Visitors vs 2019 Baseline =
+VAR Baseline =
+    CALCULATE ( [Total Visitors], REMOVEFILTERS ( 'Year' ), 'Year'[Year] = 2019 )
+RETURN
+    DIVIDE ( [Total Visitors], Baseline )
+
+// Composite index computed in Python (equal-weighted, min-max scaled components); averaging
+// across districts is only meaningful for a selection, so show it per district.
+Resilience Index =
+AVERAGE ( Resilience[Resilience_Index] )
+
+Resilience Band =
+VAR Score = [Resilience Index]
+RETURN
+    SWITCH (
+        TRUE (),
+        ISBLANK ( Score ), BLANK (),
+        Score >= 70, "High resilience",
+        Score >= 40, "Medium resilience",
+        "Low resilience"
     )
-RETURN
-    DIVIDE([Total Tourist Footfall] - PreviousYearFootfall, PreviousYearFootfall, 0)
-
-MoM Footfall Change % = 
-VAR PreviousMonthFootfall = 
-    CALCULATE(
-        [Total Tourist Footfall], 
-        DATEADD('Calendar'[Date], -1, MONTH)
-    )
-RETURN
-    DIVIDE([Total Tourist Footfall] - PreviousMonthFootfall, PreviousMonthFootfall, 0)
-
-// ----------------------------------------------------------------------------
-// 3. CLIMATE VULNERABILITY INDEX (CVI) & RISK SCORING
-// ----------------------------------------------------------------------------
-
-Climate Vulnerability Score = 
-VAR NormalizedRainfall = 
-    DIVIDE(
-        [Average Monthly Rainfall (mm)], 
-        MAXX(ALL('uttarakhand_district_tourism_fixed'), 'uttarakhand_district_tourism_fixed'[Rainfall_mm]), 
-        0
-    ) * 50
-
-VAR NormalizedLandslides = 
-    DIVIDE(
-        [Total Landslide Events], 
-        MAXX(ALL('uttarakhand_district_tourism_fixed'), 'uttarakhand_district_tourism_fixed'[Landslide_Count]), 
-        0
-    ) * 50
-
-RETURN
-    ROUND(NormalizedRainfall + NormalizedLandslides, 1)
-
-Risk Level Indicator = 
-VAR Score = [Climate Vulnerability Score]
-RETURN
-    SWITCH(
-        TRUE(),
-        Score >= 70, "High Risk 🔴",
-        Score >= 40, "Moderate Risk 🟡",
-        "Low Risk 🟢"
-    )
-
-// ----------------------------------------------------------------------------
-// 4. SCENARIO ANALYSIS & RESILIENCE METRICS
-// ----------------------------------------------------------------------------
-
-Monsoon Footfall Share % = 
-VAR MonsoonFootfall = 
-    CALCULATE(
-        [Total Tourist Footfall],
-        FILTER('Calendar', 'Calendar'[MonthName] IN {"July", "August", "September"})
-    )
-RETURN
-    DIVIDE(MonsoonFootfall, [Total Tourist Footfall], 0)
-
-Post-Disaster Recovery Index = 
-VAR PostDisasterFootfall = CALCULATE([Total Tourist Footfall], DATEADD('Calendar'[Date], 1, MONTH))
-VAR PreDisasterFootfall  = CALCULATE([Total Tourist Footfall], DATEADD('Calendar'[Date], -1, MONTH))
-RETURN
-    DIVIDE(PostDisasterFootfall, PreDisasterFootfall, 0)

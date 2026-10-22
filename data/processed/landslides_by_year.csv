@@ -1,0 +1,10 @@
+Year,Landslides,Type,Comparable_Event_Count
+1998,1419,Field-based mapping,False
+2003,32,Event-based,True
+2010,307,Event-based,True
+2012,473,Event-based,True
+2013,6610,Event-based (Kedarnath),True
+2014,1593,Monsoon season,False
+2017,456,Monsoon + Event,False
+2021,329,Event-based (Chamoli),True
+2022,1,Event-based,True
